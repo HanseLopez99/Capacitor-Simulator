@@ -3,6 +3,8 @@ from tkinter import ttk
 import math
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.patches import Rectangle, Circle, Wedge
+
 from Funciones import *
 
 class CapacitorSimulator(tk.Tk):
@@ -37,6 +39,16 @@ class CapacitorSimulator(tk.Tk):
         # Botón para calcular
         self.calculate_btn = ttk.Button(self, text="Calcular", command=self.calculate)
         self.calculate_btn.pack(pady=20)
+
+        for input_widget in self.inputs.values():
+            if isinstance(input_widget, ttk.Entry):
+                input_widget.bind('<KeyRelease>', self.draw_capacitor)
+            elif isinstance(input_widget, ttk.Checkbutton):
+                input_widget.config(command=self.draw_capacitor)
+
+        self.calculate_btn.bind("<ButtonRelease-1>", self.draw_capacitor)
+
+        self.draw_capacitor()
 
     def update_input_fields(self, event):
         for widget in self.parameters_frame.winfo_children():
@@ -118,6 +130,7 @@ class CapacitorSimulator(tk.Tk):
 
         self.show_results(results)
         self.draw_capacitor()
+        
 
     def show_results(self, results):
         for widget in self.results_frame.winfo_children():
@@ -150,78 +163,62 @@ class CapacitorSimulator(tk.Tk):
                     ttk.Label(frame, text=f'{result:.2e}').pack(side=tk.RIGHT, padx=5)
 
 
-    def draw_capacitor(self):
-        self.ax.clear()
-        capacitor = self.capacitor_type.get()
+    def draw_capacitor(self, event=None):
+        try:
+            self.ax.clear()
+            capacitor = self.capacitor_type.get()
 
-        if capacitor == 'Placas paralelas':
-            base = float(self.inputs['base'].get())
-            altura = float(self.inputs['altura'].get())
-            distancia = float(self.inputs['distancia'].get())
+            if capacitor == 'Placas paralelas':
+                if 'base' in self.inputs and 'altura' in self.inputs and 'distancia' in self.inputs:
+                    base = float(self.inputs['base'].get())
+                    altura = float(self.inputs['altura'].get())
+                    distancia = float(self.inputs['distancia'].get())
 
-            # Dibuja la placa inferior
-            self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2 - distancia), base, altura, color='blue'))
-            self.ax.text(0.5, 0.5 - altura/2 - distancia/2, 'Placa inferior', ha='center', va='center', color='white')
+                    # Dibuja la placa inferior
+                    self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2 - distancia), base, altura, color='blue'))
+                    self.ax.text(0.5, 0.5 - altura/2 - distancia/2, 'Placa inferior', ha='center', va='center', color='white')
+                    
+                    # Dibuja la placa superior
+                    self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 + distancia/2), base, altura, color='red'))
+                    self.ax.text(0.5, 0.5 + distancia/2 + altura/2, 'Placa superior', ha='center', va='center', color='white')
+                    
+                    # Dibuja el dieléctrico si está seleccionado
+                    if self.inputs['dieléctrico'].instate(['selected']):
+                        if self.inputs['half'].instate(['selected']):
+                            self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2), base/2, altura, color='yellow'))
+                            self.ax.text(0.5 - base/4, 0.5, 'Dieléctrico', ha='center', va='center', color='black')
+                        else:
+                            self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2), base, altura, color='yellow'))
+                            self.ax.text(0.5, 0.5, 'Dieléctrico', ha='center', va='center', color='black')
+
+            elif (capacitor == 'Cilindrico' or capacitor == 'Esferico'):
+                if 'r1' in self.inputs and 'r2' in self.inputs:
+                    r1 = float(self.inputs['r1'].get())
+                    r2 = float(self.inputs['r2'].get())
+                    self.ax.add_patch(Circle((0.5, 0.5), r1, color='blue'))
+                    self.ax.add_patch(Circle((0.5, 0.5), r2, fill=False, color='red'))
+                    if self.inputs['dieléctrico'].instate(['selected']):
+                        if self.inputs['half'].instate(['selected']):
+                            wedge = Wedge(center=(0.5, 0.5), r=r2, theta1=0, theta2=-180, width=r2-r1, color='yellow')
+                            self.ax.add_patch(wedge)
+                        else:
+                            self.ax.add_patch(Circle((0.5, 0.5), r2, color='yellow', alpha=0.5))
+                            self.ax.add_patch(Circle((0.5, 0.5), r1, color='blue'))
+
+            if capacitor == 'Placas paralelas':
+                max_dimension = max(base + 2 * distancia, altura + 2 * distancia)
+                self.ax.set_xlim(0.5 - max_dimension, 0.5 + max_dimension)
+                self.ax.set_ylim(0.5 - max_dimension, 0.5 + max_dimension)
+                self.canvas.draw()
+            elif capacitor == 'Cilindrico' or capacitor == 'Esferico':
+                max_dimension = max(r1, r2) + 0.1
+                self.ax.set_xlim(0.5 - max_dimension, 0.5 + max_dimension)
+                self.ax.set_ylim(0.5 - max_dimension, 0.5 + max_dimension)
+                self.canvas.draw()
             
-            # Dibuja la placa superior
-            self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 + distancia/2), base, altura, color='red'))
-            self.ax.text(0.5, 0.5 + distancia/2 + altura/2, 'Placa superior', ha='center', va='center', color='white')
-            
-            # Dibuja el dieléctrico si está seleccionado
-            if self.inputs['dieléctrico'].instate(['selected']):
-                if self.inputs['half'].instate(['selected']):
-                    self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2), base/2, altura, color='yellow'))
-                    self.ax.text(0.5 - base/4, 0.5, 'Dieléctrico', ha='center', va='center', color='black')
-                else:
-                    self.ax.add_patch(plt.Rectangle((0.5 - base/2, 0.5 - altura/2), base, altura, color='yellow'))
-                    self.ax.text(0.5, 0.5, 'Dieléctrico', ha='center', va='center', color='black')
+        except Exception as e:
+            print(f"Error al dibujar el capacitor: {str(e)}")
 
-        elif capacitor == 'Cilindrico':
-            r1 = float(self.inputs['r1'].get()) / 10
-            r2 = float(self.inputs['r2'].get()) / 10
-            circle1 = plt.Circle((0.5, 0.5), r1, color='blue')
-            circle2 = plt.Circle((0.5, 0.5), r2, color='red', fill=False)
-            self.ax.add_artist(circle1)
-            self.ax.add_artist(circle2)
-            self.ax.text(0.5, 0.5, 'Interior', ha='center', va='center', color='white')
-            if self.inputs['dieléctrico'].instate(['selected']):
-                if self.inputs['half'].instate(['selected']):
-                    wedge = plt.Wedge(center=(0.5, 0.5), r=r2, theta1=0, theta2=180, width=r2-r1, color='yellow')
-                    self.ax.add_artist(wedge)
-                else:
-                    circle3 = plt.Circle((0.5, 0.5), r2, color='yellow', fill=False, linewidth=2*(r2-r1))
-                    self.ax.add_artist(circle3)
-        elif capacitor == 'Esferico':
-            r1 = float(self.inputs['r1'].get()) / 10
-            r2 = float(self.inputs['r2'].get()) / 10
-            circle1 = plt.Circle((0.5, 0.5), r1, color='blue')
-            circle2 = plt.Circle((0.5, 0.5), r2, color='red', fill=False)
-            self.ax.add_artist(circle1)
-            self.ax.add_artist(circle2)
-            self.ax.text(0.5, 0.5, 'Interior', ha='center', va='center', color='white')
-            if self.inputs['dieléctrico'].instate(['selected']):
-                if self.inputs['half'].instate(['selected']):
-                    wedge = plt.Wedge(center=(0.5, 0.5), r=r2, theta1=0, theta2=180, width=r2-r1, color='yellow')
-                    self.ax.add_artist(wedge)
-                else:
-                    circle3 = plt.Circle((0.5, 0.5), r2, color='yellow', fill=False, linewidth=2*(r2-r1))
-                    self.ax.add_artist(circle3)
-
-        if capacitor == 'Placas paralelas':
-            max_dimension = max(base + 2 * distancia, altura + 2 * distancia)
-            self.ax.set_xlim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.ax.set_ylim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.canvas.draw()
-        elif capacitor == 'Cilindrico':
-            max_dimension = max(r1 + 1, r2 + 1)
-            self.ax.set_xlim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.ax.set_ylim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.canvas.draw()
-        elif capacitor == 'Esferico':
-            max_dimension = max(r1 + 1, r2 + 1)
-            self.ax.set_xlim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.ax.set_ylim(0.5 - max_dimension, 0.5 + max_dimension)
-            self.canvas.draw()
 
 
 if __name__ == "__main__":
